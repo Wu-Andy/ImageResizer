@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace ImageResizer
 {
@@ -38,24 +40,62 @@ namespace ImageResizer
         public void ResizeImages(string sourcePath, string destPath, double scale)
         {
             var allFiles = FindImages(sourcePath);
+
             foreach (var filePath in allFiles)
             {
-                Image imgPhoto = Image.FromFile(filePath);
-                string imgName = Path.GetFileNameWithoutExtension(filePath);
+                    var imgPhoto = Image.FromFile(filePath);
+                    var imgName = Path.GetFileNameWithoutExtension(filePath);
 
-                int sourceWidth = imgPhoto.Width;
-                int sourceHeight = imgPhoto.Height;
+                    var sourceWidth = imgPhoto.Width;
+                    var sourceHeight = imgPhoto.Height;
 
-                int destionatonWidth = (int)(sourceWidth * scale);
-                int destionatonHeight = (int)(sourceHeight * scale);
+                    var destionatonWidth = (int)(sourceWidth * scale);
+                    var destionatonHeight = (int)(sourceHeight * scale);
 
-                Bitmap processedImage = processBitmap((Bitmap)imgPhoto,
-                    sourceWidth, sourceHeight,
-                    destionatonWidth, destionatonHeight);
+                    var processedImage = ProcessBitmap((Bitmap)imgPhoto,
+                                                       sourceWidth, sourceHeight,
+                                                       destionatonWidth, destionatonHeight);
 
-                string destFile = Path.Combine(destPath, imgName + ".jpg");
-                processedImage.Save(destFile, ImageFormat.Jpeg);
+                    processedImage.Save(Path.Combine(destPath, imgName + ".jpg"), ImageFormat.Jpeg);
+                processedImage.Dispose();
             }
+        }
+
+        /// <summary>
+        /// 進行圖片的縮放作業-改非同步
+        /// </summary>
+        /// <param name="sourcePath">圖片來源目錄路徑</param>
+        /// <param name="destPath">產生圖片目的目錄路徑</param>
+        /// <param name="scale">縮放比例</param>
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        {
+            var allFiles = FindImages(sourcePath);
+
+            var taskList = new List<Task>();
+            foreach (var filePath in allFiles)
+            {
+                var task = Task.Run(() =>
+                {
+                    var imgPhoto = Image.FromFile(filePath);
+                    var imgName = Path.GetFileNameWithoutExtension(filePath);
+
+                    var sourceWidth = imgPhoto.Width;
+                    var sourceHeight = imgPhoto.Height;
+
+                    var destionatonWidth = (int)(sourceWidth * scale);
+                    var destionatonHeight = (int)(sourceHeight * scale);
+
+                    var processedImage = ProcessBitmap((Bitmap)imgPhoto,
+                                                       sourceWidth, sourceHeight,
+                                                       destionatonWidth, destionatonHeight);
+
+                    processedImage.Save(Path.Combine(destPath, imgName + ".jpg"), ImageFormat.Jpeg);
+                    processedImage.Dispose();
+                });
+
+                taskList.Add(task);
+            }
+            await Task.WhenAll(taskList);
         }
 
         /// <summary>
@@ -81,18 +121,19 @@ namespace ImageResizer
         /// <param name="newWidth">新圖片的寬度</param>
         /// <param name="newHeight">新圖片的高度</param>
         /// <returns></returns>
-        Bitmap processBitmap(Bitmap img, int srcWidth, int srcHeight, int newWidth, int newHeight)
+        Bitmap ProcessBitmap(Bitmap img, int srcWidth, int srcHeight, int newWidth, int newHeight)
         {
-            Bitmap resizedbitmap = new Bitmap(newWidth, newHeight);
-            Graphics g = Graphics.FromImage(resizedbitmap);
-            g.InterpolationMode = InterpolationMode.High;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.Clear(Color.Transparent);
-            g.DrawImage(img,
-                new Rectangle(0, 0, newWidth, newHeight),
-                new Rectangle(0, 0, srcWidth, srcHeight),
-                GraphicsUnit.Pixel);
-            return resizedbitmap;
+                Bitmap resizedbitmap = new Bitmap(newWidth, newHeight);
+                Graphics g = Graphics.FromImage(resizedbitmap);
+                g.InterpolationMode = InterpolationMode.High;
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.Clear(Color.Transparent);
+                g.DrawImage(img,
+                    new Rectangle(0, 0, newWidth, newHeight),
+                    new Rectangle(0, 0, srcWidth, srcHeight),
+                    GraphicsUnit.Pixel);
+                g.Dispose();
+                return resizedbitmap;
         }
     }
 }
